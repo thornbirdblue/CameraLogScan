@@ -43,6 +43,7 @@ CamLogDirName='camera_log'
 debugLog = 0
 debugLogLevel=(0,1,2,3)	# 0:no log; 1:op logic; 2:op; 3:verbose
 unzip_files_ctrl = 0
+fileName=''
 
 class CameraLogScan:
         __filename=''
@@ -173,7 +174,7 @@ class CameraLogScan:
                 fd.write(self.__filename+': '+str(self.__logLines)+'\n')
 
                 fd.write('BeginTime: '+self.__beginTime+'\n')
-                fd.write('EndTime: '+self.__endTime+'\n')
+                fd.write('EndTime  : '+self.__endTime+'\n')
 
                 fd.write('\n')
                 
@@ -195,6 +196,19 @@ class CameraLogScan:
                     fd.write(self.__CameraFlows[i]+'\n')
                 fd.write('\n')
 		
+        def Dump(self):
+	    if debugLog >= debugLogLevel[-1]:
+	        print 'Dump:'
+
+            if self.__logLines:
+                print self.__filename+': '+str(self.__logLines)
+
+                print 'BeginTime: '+self.__beginTime
+                print 'EndTime  : '+self.__endTime+'\n'
+
+                print '1.ErrorFlowsNum: '+str(self.__ErrFlowsNum)
+                print '2.KeyWordsNum  : '+str(self.__KeyWordsNum)
+                print '3.FlowsNum     : '+str(self.__FlowsNum)
 
         def getFileName(self):
 	    return self.__filename
@@ -456,6 +470,17 @@ def SaveData(filename,datas):
 	if debugLog >= debugLogLevel[1]:
             print '\nSaveFile: ',filename
 
+def DumpData(datas):
+    print '\nOutput Result:'
+    print 'Scan Total Files: '+str(len(datas))
+    print 'Files:'
+    for i in range(0,len(datas)):
+        print datas[i].getFileName()
+   
+    print
+
+    for i in range(0,len(datas)):
+        datas[i].Dump()
 
 def ScanDir(Dir):
     CamDirs=[]
@@ -571,6 +596,8 @@ if __name__ == '__main__':
 	
 
         ScanDir(spath)
-        
+       
         if fileName:
             SaveData(fileName,Datas)
+        else:
+            DumpData(Datas)
