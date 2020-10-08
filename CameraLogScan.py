@@ -19,21 +19,30 @@
 #	Name		Data		Ver		Act
 #--------------------------------------------------------------------------
 #	liuchangjian	2020-09-28	v1.0		create
+#	liuchangjian	2020-09-30	v1.0		release first test version
+#	liuchangjian	2020-10-08	v1.0		Add unzip function
+#	liuchangjian	2020-10-08	v1.0		output txt file
 #
 ###########################################################################
 
 #!/bin/python
 import sys,os,re,string,time,datetime
+import zipfile
 
 # default Configure File Name
 DefaultConfigFile='configfile'
 ConfigFile=''
+ConfigFileSplitSym=','
 
 ScanPath=''
+
+DirDefine='bbk_log'
+CamLogDirName='camera_log'
 
 # log var
 debugLog = 0
 debugLogLevel=(0,1,2,3)	# 0:no log; 1:op logic; 2:op; 3:verbose
+unzip_files_ctrl = 0
 
 class CameraLogFile:
         __filename=''
@@ -72,7 +81,7 @@ class CameraLogFile:
                 print 'CheckFlow: '+line,Flows
 
             for key,values in Flows.items():
-                for i in values.split(','):
+                for i in values.split(ConfigFileSplitSym):
                     pattern = re.compile(i)
                 
                     m = re.search(pattern,line)
@@ -82,8 +91,9 @@ class CameraLogFile:
                         
                         timeFormat = re.compile(r'\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}')
                         time = re.match(timeFormat,line)
-                        
-                        self.__CameraFlows.append(time.group()+' '+key)
+
+                        if time:
+                            self.__CameraFlows.append(time.group()+' '+key)
 
                         if debugLog >= debugLogLevel[2]:
                             print 'Find Flows: '+i+'\n'+line
@@ -143,7 +153,8 @@ class CameraLogFile:
 	            if debugLog >= debugLogLevel[2]:
                        print 'Begin Time:',self.__beginTime
                 else:
-                    self.__endTime = time.group()
+                    if time:
+                        self.__endTime = time.group()
 
 		if debugLog >= debugLogLevel[-1]:
 	            print 'INFO: Read line --->'+line
@@ -271,7 +282,7 @@ class ConfigFileType:
                             if not line[1]:
                                 print 'ERROR configfile Format: '+line[1]
                             else:
-                                ScanFiles.SetScanFiles(line[1].strip().split(','))
+                                ScanFiles.SetScanFiles(line[1].strip().split(ConfigFileSplitSym))
 
                         elif self.__ConfigTags[i] == self.__FlowNameKey:
                             flows= line[1].split(';')
@@ -292,13 +303,13 @@ class ConfigFileType:
                             if not line[1]:
                                 print 'ERROR configfile Format: '+line[1]
                             else:
-                                ScanFiles.SetErrLogs(line[1].strip().split(','))
+                                ScanFiles.SetErrLogs(line[1].strip().split(ConfigFileSplitSym))
 
                         elif self.__ConfigTags[i] == self.__KeyWordsKey:
                             if not line[1]:
                                 print 'ERROR configfile Format: '+line[1]
                             else:
-                                ScanFiles.SetKeyWords(line[1].strip().split(','))
+                                ScanFiles.SetKeyWords(line[1].strip().split(ConfigFileSplitSym))
                         break
                     else:
 		        if debugLog >= debugLogLevel[-1]:
@@ -314,6 +325,25 @@ def CameraFlowCheck(filename,fd):
 
     Files.append(LogFile)
 
+def unzip_file(zip_src,dst_dir):
+    if debugLog >= debugLogLevel[-1]:
+          print '(INFO) Unzip File: '+dst_dir+'/'+zip_src
+
+    fz = zipfile.ZipFile(zip_src,'r')
+
+    for name in fz.namelist():
+        CamLogDir = re.compile(CamLogDirName)
+
+        m = re.search(CamLogDir,name)
+        if m:
+            if debugLog >= debugLogLevel[1]:
+                print "unzip CamLog Dir: "+name
+
+            fz.extract(name,dst_dir)
+        else:
+            if debugLog >= debugLogLevel[-1]:
+	        print '(INFO) NOT Camera Log Dir: '+name
+    fz.close()
 
 def ScanCameraLog(arg,dirname,files):
     if debugLog >= debugLogLevel[-1]:
@@ -323,28 +353,29 @@ def ScanCameraLog(arg,dirname,files):
 	print dirname
 
     if debugLog >= debugLogLevel[2]:
-        print ScanFiles.GetScanFiles()
+        print "(INFO) Match File Type: ",ScanFiles.GetScanFiles()
     
     LogTypes = ScanFiles.GetScanFiles()
 
     for file in files:
+
         for i in range(0,len(LogTypes)):
 	    if debugLog >= debugLogLevel[-1]:
                 print "File Match Format: "+LogTypes[i]
-
+            
 	    logTypes = re.compile(LogTypes[i])
 
 	    if debugLog >= debugLogLevel[-1]:
 	        print file
 		
-	    m = re.match(logTypes,file)
+	    m = re.search(logTypes,file)
 	    if m:
 	        path,name = os.path.split(dirname)
 
 		if debugLog >= debugLogLevel[-1]:
 	            print 'Find Dir: '+dirname
 		
-                if debugLog >= debugLogLevel[2]:
+                if debugLog >= debugLogLevel[1]:
 	            print 'Find Match File: '+file
 
                 try:
@@ -361,6 +392,24 @@ def ScanCameraLog(arg,dirname,files):
 		    print "open file ERROR: Can't open"+os.path.join(dirname,file)
 
 
+def ScanDir(Dir):
+    CamDirs=[]
+    print 'Scan DIR: '+Dir+'\n'
+
+    # 2020-10-08 add unzip file start
+    if unzip_files_ctrl:
+        for root,dirs,files in os.walk(Dir):
+            for f in os.listdir(root):
+                r=zipfile.is_zipfile(f)
+
+                if r:
+                    if debugLog >= debugLogLevel[2]:
+	                print 'Unzip File: '+f
+                    
+                    unzip_file(f,Dir)
+    # 2020-10-08 add end
+
+    os.path.walk(Dir,ScanCameraLog,())
 
 def ParseConfigFile():
     global ConfigFile
@@ -434,11 +483,14 @@ def ParseArgv():
 				else:
 					Usage()
 					sys.exit()
-					
+			elif sys.argv[i] == '-z':
+				global unzip_files_ctrl
+				unzip_files_ctrl = 1
+				print 'Unzip files!'
 					
 def Usage():
 	print 'Command Format :'
-	print '		CameraLogScan [-d 1/2/3] [-o outputfile] [-p path]  [-c configfile]| [-h]'
+	print '		CameraLogScan [-d 1/2/3] [-o outputfile] [-p path]  [-c configfile] [-z(unzip zip files)]| [-h]'
 
 appParaNum = 6
 
@@ -452,6 +504,5 @@ if __name__ == '__main__':
 	else:
 		spath = ScanPath
 	
-        print 'Scan DIR: '+spath+'\n'
 
-        os.path.walk(spath,ScanCameraLog,())
+        ScanDir(spath)
