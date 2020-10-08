@@ -38,14 +38,16 @@ ScanPath=''
 
 DirDefine='bbk_log'
 CamLogDirName='camera_log'
+CamLogFileName='cam_log_'
 
 # log var
 debugLog = 0
 debugLogLevel=(0,1,2,3)	# 0:no log; 1:op logic; 2:op; 3:verbose
-unzip_files_ctrl = 0
-fileName=''
+unzip_files_ctrl = 1
+fileName='CamLogScanResult.txt'
 
 class CameraLogScan:
+        __dirname=''
         __filename=''
         __fd=''
 
@@ -66,7 +68,8 @@ class CameraLogScan:
         __KeyWordsNum=0
         __KeyWords=[]
 
-        def __init__(self,filename,fd):
+        def __init__(self,dirname,filename,fd):
+            self.__dirname=dirname
             self.__filename=filename
             self.__fd=fd
             self.__logLines=0
@@ -166,6 +169,25 @@ class CameraLogScan:
                 
                 self.__logLines += 1
 
+        def __SaveFile(self,filename,datas):
+            if len(datas):
+                try:
+                    fd = open(filename,'wt')
+                
+                    for i in range(0,len(datas)):
+                        fd.write(datas[i]+'\n')
+                except IOError:
+                    print "Error: Can't open or write!!!"
+                else:
+                    fd.close()
+                    print 'Save file: '+filename
+            else:
+	        if debugLog >= debugLogLevel[2]:
+	            print '(WARN) Save File len is 0!'
+                
+
+            
+
         def SaveToFile(self,fd):
 	    if debugLog >= debugLogLevel[-1]:
 	        print 'SaveToFile:'
@@ -176,26 +198,15 @@ class CameraLogScan:
                 fd.write('BeginTime: '+self.__beginTime+'\n')
                 fd.write('EndTime  : '+self.__endTime+'\n')
 
-                fd.write('\n')
-                
                 fd.write('1.ErrorFlowsNum: '+str(self.__ErrFlowsNum)+'\n')
-                fd.write('ErrorFlows:\n')
-                for i in range(0,len(self.__ErrFlows)):
-                    fd.write(self.__ErrFlows[i]+'\n')
-                fd.write('\n')
-                
                 fd.write('2.KeyWordsNum: '+str(self.__KeyWordsNum)+'\n')
-                fd.write('KeyWords:')
-                for i in range(0,len(self.__KeyWords)):
-                    fd.write(self.__KeyWords[i]+'\n')
-                fd.write('\n')
-                
                 fd.write('3.FlowsNum: '+str(self.__FlowsNum)+'\n')
-                fd.write('Flows:\n')
-                for i in range(0,len(self.__CameraFlows)):
-                    fd.write(self.__CameraFlows[i]+'\n')
                 fd.write('\n')
-		
+
+                self.__SaveFile(self.__filename+'_ErrorFlows.txt',self.__ErrFlows)
+                self.__SaveFile(self.__filename+'_KeyWords.txt',self.__KeyWords)
+                self.__SaveFile(self.__filename+'_CameraFlows.txt',self.__CameraFlows)
+
         def Dump(self):
 	    if debugLog >= debugLogLevel[-1]:
 	        print 'Dump:'
@@ -211,7 +222,7 @@ class CameraLogScan:
                 print '3.FlowsNum     : '+str(self.__FlowsNum)
 
         def getFileName(self):
-	    return self.__filename
+	    return os.path.join(self.__dirname,self.__filename)
 
         def getLogLines(self):
 	    return self.__logLines
@@ -364,11 +375,11 @@ class ConfigFileType:
 		        if debugLog >= debugLogLevel[-1]:
                             print '\n(WARN) NO Match: '+self.__ConfigTags[i]+':'
 
-def CameraFlowCheck(filename,fd):
+def CameraFlowCheck(dirname,filename,fd):
     if debugLog >= debugLogLevel[-1]:
         print 'Scan Log:  '+filename
 
-    LogScan = CameraLogScan(filename,fd)
+    LogScan = CameraLogScan(dirname,filename,fd)
 
     LogScan.CheckLogs(ScanFiles.GetFlows(),ScanFiles.GetErrLogs(),ScanFiles.GetKeyWords())
 
@@ -385,15 +396,27 @@ def unzip_file(zip_src,dst_dir):
 
         m = re.search(CamLogDir,name)
         if m:
-            if debugLog >= debugLogLevel[2]:
+            if debugLog >= debugLogLevel[1]:
                 print "unzip CamLog Dir: "+name
 
             fz.extract(name,dst_dir)
         else:
             if debugLog >= debugLogLevel[-1]:
 	        print '(INFO) NOT Camera Log Dir: '+name
+        
+        CamLog = re.compile(CamLogFileName)
 
-    if debugLog >= debugLogLevel[1]:
+        m = re.search(CamLog,name)
+        if m:
+            if debugLog >= debugLogLevel[1]:
+                print "unzip CamLog file: "+name
+
+            fz.extract(name,dst_dir)
+        else:
+            if debugLog >= debugLogLevel[-1]:
+	        print '(INFO) NOT Camera Log Dir: '+name
+
+    if debugLog >= debugLogLevel[2]:
         print "Finish Unzip file: "+zip_src+'\n'
 
     fz.close()
@@ -415,6 +438,13 @@ def ScanCameraLog(arg,dirname,files):
         for i in range(0,len(LogTypes)):
 	    if debugLog >= debugLogLevel[-1]:
                 print "File Match Format: "+LogTypes[i]
+        
+            r=zipfile.is_zipfile(os.path.join(dirname,file))
+
+            if r:
+	        if debugLog >= debugLogLevel[2]:
+                    print 'File '+file+' is zipfile,SKIP!'
+                continue
             
 	    logTypes = re.compile(LogTypes[i])
 
@@ -437,7 +467,7 @@ def ScanCameraLog(arg,dirname,files):
 		    if debugLog >= debugLogLevel[-1]:
 			print 'INFO: open file :'+os.path.join(dirname,file)
 
-		    CameraFlowCheck(file,fd)
+		    CameraFlowCheck(dirname,file,fd)
 
                     fd.close()
 
@@ -453,10 +483,9 @@ def SaveData(filename,datas):
 
         fo.write('Scan Total Files: '+str(len(datas))+'\n')
         
-        fo.write('Files:')
+        fo.write('Files:\n')
         for i in range(0,len(datas)):
-            fo.write(' ')
-            fo.write(datas[i].getFileName())
+            fo.write(datas[i].getFileName()+'\n')
         fo.write('\n\n')
 
         for i in range(0,len(datas)):
@@ -482,21 +511,32 @@ def DumpData(datas):
     for i in range(0,len(datas)):
         datas[i].Dump()
 
+def ZipFiles(args,dirname,files):
+    for f in files:
+        if debugLog >= debugLogLevel[2]:
+            print 'File is : ',os.path.join(dirname,f)
+
+        r=zipfile.is_zipfile(os.path.join(dirname,f))
+
+        if r:
+            if debugLog >= debugLogLevel[2]:
+	        print 'Unzip File: '+f
+                    
+            unzip_file(os.path.join(dirname,f),dirname)
+        else:
+            if debugLog >= debugLogLevel[-1]:
+                print '(WARN) '+f+' is not zipfile!!!'
+
 def ScanDir(Dir):
     CamDirs=[]
     print 'Scan DIR: '+Dir+'\n'
 
     # 2020-10-08 add unzip file start
     if unzip_files_ctrl:
-        for root,dirs,files in os.walk(Dir):
-            for f in os.listdir(root):
-                r=zipfile.is_zipfile(f)
-
-                if r:
-                    if debugLog >= debugLogLevel[2]:
-	                print 'Unzip File: '+f
-                    
-                    unzip_file(f,Dir)
+        if debugLog >= debugLogLevel[2]:
+	    print '(INFO) Unzip File!'
+#        for root,dirs,files in os.walk(Dir):
+        os.path.walk(Dir,ZipFiles,())
     # 2020-10-08 add end
 
     os.path.walk(Dir,ScanCameraLog,())
