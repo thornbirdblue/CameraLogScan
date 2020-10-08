@@ -385,6 +385,29 @@ def CameraFlowCheck(dirname,filename,fd):
 
     Datas.append(LogScan)
 
+def unzip_camlog_file(name,dst_dir):
+    CamLog = re.compile(CamLogFileName)
+
+    m = re.search(CamLog,name)
+    if m:
+        
+        r=zipfile.is_zipfile(name)
+
+        if r:
+            if debugLog >= debugLogLevel[1]:
+                print "unzip CamLog file: "+name
+
+            fz = zipfile.ZipFile(name,'r')    
+        
+            for name in fz.namelist():
+                fz.extract(name,dst_dir)
+        
+            fz.close()
+    else:
+        if debugLog >= debugLogLevel[-1]:
+	    print '(INFO) NOT Camera Log Dir: '+name
+
+
 def unzip_file(zip_src,dst_dir):
     if debugLog >= debugLogLevel[-1]:
           print '(INFO) Unzip File: '+dst_dir+'/'+zip_src
@@ -399,22 +422,19 @@ def unzip_file(zip_src,dst_dir):
             if debugLog >= debugLogLevel[1]:
                 print "unzip CamLog Dir: "+name
 
-            fz.extract(name,dst_dir)
+            fz.extract(name,dst_dir)        
         else:
             if debugLog >= debugLogLevel[-1]:
 	        print '(INFO) NOT Camera Log Dir: '+name
         
+        unzip_camlog_file(name,os.path.dirname(name))
+        
         CamLog = re.compile(CamLogFileName)
-
-        m = re.search(CamLog,name)
+        m = re.match(CamLog,name)
         if m:
             if debugLog >= debugLogLevel[1]:
-                print "unzip CamLog file: "+name
-
-            fz.extract(name,dst_dir)
-        else:
-            if debugLog >= debugLogLevel[-1]:
-	        print '(INFO) NOT Camera Log Dir: '+name
+                print "unzip CamLog File: "+name
+            fz.extract(name,dst_dir)        
 
     if debugLog >= debugLogLevel[2]:
         print "Finish Unzip file: "+zip_src+'\n'
@@ -451,7 +471,7 @@ def ScanCameraLog(arg,dirname,files):
 	    if debugLog >= debugLogLevel[-1]:
 	        print file
 		
-	    m = re.search(logTypes,file)
+	    m = re.match(logTypes,file)
 	    if m:
 	        path,name = os.path.split(dirname)
 
@@ -519,12 +539,9 @@ def ZipFiles(args,dirname,files):
         r=zipfile.is_zipfile(os.path.join(dirname,f))
 
         if r:
-            if debugLog >= debugLogLevel[2]:
-	        print 'Unzip File: '+f
-                    
             unzip_file(os.path.join(dirname,f),dirname)
         else:
-            if debugLog >= debugLogLevel[-1]:
+            if debugLog >= debugLogLevel[2]:
                 print '(WARN) '+f+' is not zipfile!!!'
 
 def ScanDir(Dir):
@@ -533,7 +550,7 @@ def ScanDir(Dir):
 
     # 2020-10-08 add unzip file start
     if unzip_files_ctrl:
-        if debugLog >= debugLogLevel[2]:
+        if debugLog >= debugLogLevel[1]:
 	    print '(INFO) Unzip File!'
 #        for root,dirs,files in os.walk(Dir):
         os.path.walk(Dir,ZipFiles,())
