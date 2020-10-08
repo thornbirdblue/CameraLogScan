@@ -44,11 +44,11 @@ debugLog = 0
 debugLogLevel=(0,1,2,3)	# 0:no log; 1:op logic; 2:op; 3:verbose
 unzip_files_ctrl = 0
 
-class CameraLogFile:
+class CameraLogScan:
         __filename=''
         __fd=''
 
-        __loglines=0
+        __logLines=0
         
         __beginTime=''
         __endTime=''
@@ -56,22 +56,19 @@ class CameraLogFile:
         __FlowsNum=0
         __CameraFlows=[]
 
-        __ErrorFlowsNum=0
-        __ErrorFlows=[]
+        __ErrFlowsNum=0
+        __ErrFlows=[]
 
-        __Errflows=[]
-        __errFlowsNum=0
-        
-        __ErrLogs=[]
         __ErrLogsNum=0
+        __ErrLogs=[]
 
-        __KeyWords=[]
         __KeyWordsNum=0
+        __KeyWords=[]
 
         def __init__(self,filename,fd):
             self.__filename=filename
             self.__fd=fd
-            self.__loglines=0
+            self.__logLines=0
 
         def __get_key (self,dict, value):
             return [k for k, v in dict.items() if v == value]
@@ -137,18 +134,19 @@ class CameraLogFile:
             
             while 1:
 		line = self.__fd.readline()
-			
+		
 		if not line:
                     if debugLog >= debugLogLevel[2]:
                         if self.__endTime !='':
                             print 'End Time:',self.__endTime
                         print '(INFO) Finish Parse file: '+self.__filename
-                        print '(INFO) lines: ',self.__loglines,'\n'
+                        print '(INFO) lines: ',self.__logLines,'\n'
 		    break;
 
                 timeFormat = re.compile(r'\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}')
                 time = re.match(timeFormat,line)
-		if time and self.__loglines == 0:
+		
+                if time and self.__logLines == 0:
                     self.__beginTime = time.group()
 	            if debugLog >= debugLogLevel[2]:
                        print 'Begin Time:',self.__beginTime
@@ -156,8 +154,8 @@ class CameraLogFile:
                     if time:
                         self.__endTime = time.group()
 
-		if debugLog >= debugLogLevel[-1]:
-	            print 'INFO: Read line --->'+line
+	            if debugLog >= debugLogLevel[-1]:
+	                print 'INFO: Read line --->'+line
 
                 self.__CheckFlows(line,Flows)
 
@@ -165,9 +163,44 @@ class CameraLogFile:
 
                 self.__CheckKeyWords(line,KeyWords)
                 
-                self.__loglines += 1
+                self.__logLines += 1
 
+        def SaveToFile(self,fd):
+	    if debugLog >= debugLogLevel[-1]:
+	        print 'SaveToFile:'
 
+            if self.__logLines:
+                fd.write(self.__filename+': '+str(self.__logLines)+'\n')
+
+                fd.write('BeginTime: '+self.__beginTime+'\n')
+                fd.write('EndTime: '+self.__endTime+'\n')
+
+                fd.write('\n')
+                
+                fd.write('1.ErrorFlowsNum: '+str(self.__ErrFlowsNum)+'\n')
+                fd.write('ErrorFlows:\n')
+                for i in range(0,len(self.__ErrFlows)):
+                    fd.write(self.__ErrFlows[i]+'\n')
+                fd.write('\n')
+                
+                fd.write('2.KeyWordsNum: '+str(self.__KeyWordsNum)+'\n')
+                fd.write('KeyWords:')
+                for i in range(0,len(self.__KeyWords)):
+                    fd.write(self.__KeyWords[i]+'\n')
+                fd.write('\n')
+                
+                fd.write('3.FlowsNum: '+str(self.__FlowsNum)+'\n')
+                fd.write('Flows:\n')
+                for i in range(0,len(self.__CameraFlows)):
+                    fd.write(self.__CameraFlows[i]+'\n')
+                fd.write('\n')
+		
+
+        def getFileName(self):
+	    return self.__filename
+
+        def getLogLines(self):
+	    return self.__logLines
 
 
 #Global Data
@@ -176,7 +209,7 @@ class ScanFileType:
         __Flows={}
         __ErrLogs=()
         __KeyWords=()
-
+        
         def SetScanFiles(self,ScanFiles):
 	    if debugLog >= debugLogLevel[-1]:
 	        print '(INFO) Set ScanFiles : ',ScanFiles
@@ -224,9 +257,11 @@ class ScanFileType:
             print 'KeyWords: ',self.__KeyWords
 
 
+
+
 #global var
 ScanFiles = ScanFileType()
-Files=[]
+Datas=[]
 
 class ConfigFileType:
 	'adb log dir info'
@@ -319,11 +354,11 @@ def CameraFlowCheck(filename,fd):
     if debugLog >= debugLogLevel[-1]:
         print 'Scan Log:  '+filename
 
-    LogFile = CameraLogFile(filename,fd)
+    LogScan = CameraLogScan(filename,fd)
 
-    LogFile.CheckLogs(ScanFiles.GetFlows(),ScanFiles.GetErrLogs(),ScanFiles.GetKeyWords())
+    LogScan.CheckLogs(ScanFiles.GetFlows(),ScanFiles.GetErrLogs(),ScanFiles.GetKeyWords())
 
-    Files.append(LogFile)
+    Datas.append(LogScan)
 
 def unzip_file(zip_src,dst_dir):
     if debugLog >= debugLogLevel[-1]:
@@ -336,13 +371,17 @@ def unzip_file(zip_src,dst_dir):
 
         m = re.search(CamLogDir,name)
         if m:
-            if debugLog >= debugLogLevel[1]:
+            if debugLog >= debugLogLevel[2]:
                 print "unzip CamLog Dir: "+name
 
             fz.extract(name,dst_dir)
         else:
             if debugLog >= debugLogLevel[-1]:
 	        print '(INFO) NOT Camera Log Dir: '+name
+
+    if debugLog >= debugLogLevel[1]:
+        print "Finish Unzip file: "+zip_src+'\n'
+
     fz.close()
 
 def ScanCameraLog(arg,dirname,files):
@@ -390,6 +429,32 @@ def ScanCameraLog(arg,dirname,files):
 
 		except IOError:
 		    print "open file ERROR: Can't open"+os.path.join(dirname,file)
+
+def SaveData(filename,datas):
+    if debugLog >= debugLogLevel[-1]:
+        print 'SaveData Begin: ',filename
+
+    try:
+        fo = open(filename,"wt")
+
+        fo.write('Scan Total Files: '+str(len(datas))+'\n')
+        
+        fo.write('Files:')
+        for i in range(0,len(datas)):
+            fo.write(' ')
+            fo.write(datas[i].getFileName())
+        fo.write('\n\n')
+
+        for i in range(0,len(datas)):
+            datas[i].SaveToFile(fo)
+
+    except IOError:
+        print "Error: Can't open or write!!!"
+    else:
+        fo.close()
+
+	if debugLog >= debugLogLevel[1]:
+            print '\nSaveFile: ',filename
 
 
 def ScanDir(Dir):
@@ -506,3 +571,6 @@ if __name__ == '__main__':
 	
 
         ScanDir(spath)
+        
+        if fileName:
+            SaveData(fileName,Datas)
