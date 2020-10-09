@@ -38,9 +38,14 @@ DefaultConfigFile='configfile'
 ConfigFile=''
 ConfigFileSplitSym=','
 
+# ConfigFile Default Value:
+DefaultScanFiles=['cam_log_\\d']
+DefaultFlows={'open': 'createDevice,m_createManagers'}
+DefaultErrLogs=['[Offline_front2]release() -OUT-','Finger']
+DefaultKeyWords=['takePicture','Record','ExynosCamera']
+
 ScanPath=''
 
-DirDefine='bbk_log'
 CamLogDirName='camera_log'
 CamLogFileName='cam_log_'
 
@@ -236,21 +241,17 @@ class CameraLogScan:
 
 #Global Data
 class ScanFileType:
-        __DefaultScanFiles=['cam_log_\\d']
-        __DefaultFlows={'open': 'createDevice,m_createManagers'}
-        __DefaultErrLogs=['[Offline_front2]release() -OUT-','Finger']
-        __DefaultKeyWords=['takePicture','Record','ExynosCamera']
-
         __ScanFiles=[]
         __Flows={}
         __ErrLogs=[]
         __KeyWords=[]
         
         def SetDefaultValue(self):
-            self.__ScanFiles = self.__DefaultScanFiles
-            self.__Flows = self.__DefaultFlows
-            self.__ErrLogs = self.__DefaultErrLogs
-            self.__KeyWords = self.__DefaultKeyWords
+            global DefaultScanFiles,DefaultFlows,DefaultErrLogs,DefaultKeyWords
+            self.__ScanFiles = DefaultScanFiles
+            self.__Flows = DefaultFlows
+            self.__ErrLogs = DefaultErrLogs
+            self.__KeyWords = DefaultKeyWords
 
         
         def SetScanFiles(self,ScanFiles):
