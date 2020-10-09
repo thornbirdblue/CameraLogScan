@@ -23,7 +23,7 @@
 #	liuchangjian	2020-10-08	v1.0		Add unzip function
 #	liuchangjian	2020-10-08	v1.0		output txt file
 #	liuchangjian	2020-10-09	v1.0		Modify Save file path to Log Dir
-#	liuchangjian	2020-10-09	v1.0		release alpha version 1.0
+#	liuchangjian	2020-10-09	v1.0		release version 1.0
 #
 ###########################################################################
 
@@ -40,9 +40,9 @@ ConfigFileSplitSym=','
 
 # ConfigFile Default Value:
 DefaultScanFiles=['cam_log_\\d']
-DefaultFlows={'open': 'createDevice,m_createManagers'}
-DefaultErrLogs=['[Offline_front2]release() -OUT-','Finger']
-DefaultKeyWords=['takePicture','Record','ExynosCamera']
+DefaultFlows={'open': 'connect call,HAL3_camera_device_open,createDevice,m_vendorSpecificPreConstructor,m_createManagers,m_createThreads,m_vendorSpecificConstructor','initalize':'HAL3_camera_device_initialize,initializeDevice','configureStream':'HAL3_camera_device_configure_streams,configureStreams,m_setStreamInfo,m_constructFrameFactory,m_setExtraStreamInfo,configure_stream','flush':'HAL3_camera_device_flush,flush,m_stopPipeline,m_captureThreadStopAndInputQ,m_clearRequestList,m_clearList','close':'HAL3_camera_device_close,releaseDevice,release,m_captureThreadStopAndInputQ,m_destroyCaptureStreamQ,m_vendorSpecificDestructor,destroyDevice,m_deinitFrameFactory,m_stopFrameFactory'}
+DefaultErrLogs=['out of memory','CRITICAL_LEAKED','lowmemorykiller: Killing']
+DefaultKeyWords=['createDevice','initializeDevice','configureStreams','configure_stream','flush','releaseDevice']
 
 ScanPath=''
 
@@ -65,9 +65,11 @@ class CameraLogScan:
         
         __beginTime=''
         __endTime=''
-        
+       
+        __CameraFlowStep=''
         __FlowsNum=0
         __CameraFlows=[]
+        __CameraFlowsLog=[]
 
         __ErrFlowsNum=0
         __ErrFlows=[]
@@ -83,6 +85,20 @@ class CameraLogScan:
             self.__filename=filename
             self.__fd=fd
             self.__logLines=0
+            
+            self.__CameraFlowStep=''
+            self.__FlowsNum=0
+            self.__CameraFlows=[]
+            self.__CameraFlowsLog=[]
+
+            self.__ErrFlowsNum=0
+            self.__ErrFlows=[]
+
+            self.__ErrLogsNum=0
+            self.__ErrLogs=[]
+
+            self.__KeyWordsNum=0
+            self.__KeyWords=[]
 
         def __get_key (self,dict, value):
             return [k for k, v in dict.items() if v == value]
@@ -96,18 +112,27 @@ class CameraLogScan:
                     pattern = re.compile(i)
                 
                     m = re.search(pattern,line)
-
                     if m:
-                        self.__FlowsNum += 1
-                        
-                        timeFormat = re.compile(r'\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}')
-                        time = re.match(timeFormat,line)
-
-                        if time:
-                            self.__CameraFlows.append(time.group()+' '+key)
-
                         if debugLog >= debugLogLevel[2]:
                             print 'Find Flows: '+i+'\n'+line
+
+                        timeFormat = re.compile(r'\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}')
+                        time = re.match(timeFormat,line)
+                        
+                        if self.__CameraFlowStep != key:
+                            if debugLog >= debugLogLevel[2]:
+                                print 'Change Flow '+key+' to '+self.__CameraFlowStep
+
+                            self.__FlowsNum += 1
+                            self.__CameraFlows.append(time.group()+' '+key+'\n')
+
+                            self.__CameraFlowStep = key
+                        
+                        self.__CameraFlowsLog.append(line)
+
+
+                        if debugLog >= debugLogLevel[2]:
+                            print 'Not Finish '+key+'\nLast Step:  '+step
 
 
         def __CheckErrLogs(self,line,ErrLogs):
@@ -118,7 +143,6 @@ class CameraLogScan:
                 pattern = re.compile(ErrLogs[i])
 
                 m = re.search(pattern,line)
-
                 if m:
                     self.__ErrLogsNum += 1
                     self.__ErrLogs.append(line)
@@ -134,12 +158,11 @@ class CameraLogScan:
                 pattern = re.compile(KeyWords[i])
 
                 m = re.search(pattern,line)
-
                 if m:
                     self.__KeyWordsNum += 1
                     self.__KeyWords.append(line)
                     
-                    if debugLog >= debugLogLevel[-1]:
+                    if debugLog >= debugLogLevel[2]:
                         print '(WARN) Find KeyWord: '+line
 
         def CheckLogs(self,Flows,ErrLogs,KeyWords):
@@ -185,7 +208,7 @@ class CameraLogScan:
                     fd = open(os.path.join(self.__dirname,filename),'wt')
                 
                     for i in range(0,len(datas)):
-                        fd.write(datas[i]+'\n')
+                        fd.write(datas[i])
                 except IOError:
                     print "Error: Can't open or write!!!"
                 else:
@@ -217,6 +240,7 @@ class CameraLogScan:
                 self.__SaveFile(self.Tags+'_ErrFlows_'+self.__filename,self.__ErrFlows)
                 self.__SaveFile(self.Tags+'_KeyWords_'+self.__filename,self.__KeyWords)
                 self.__SaveFile(self.Tags+'_CamFlows_'+self.__filename,self.__CameraFlows)
+                self.__SaveFile(self.Tags+'_FlowsLog_'+self.__filename,self.__CameraFlowsLog)
 
         def Dump(self):
 	    if debugLog >= debugLogLevel[-1]:
