@@ -47,6 +47,7 @@ unzip_files_ctrl = 1
 fileName='CamLogScanResult.txt'
 
 class CameraLogScan:
+        Tags = 'CamScan'
         __dirname=''
         __filename=''
         __fd=''
@@ -172,7 +173,7 @@ class CameraLogScan:
         def __SaveFile(self,filename,datas):
             if len(datas):
                 try:
-                    fd = open(filename,'wt')
+                    fd = open(os.path.join(self.__dirname,filename),'wt')
                 
                     for i in range(0,len(datas)):
                         fd.write(datas[i]+'\n')
@@ -203,9 +204,9 @@ class CameraLogScan:
                 fd.write('3.FlowsNum: '+str(self.__FlowsNum)+'\n')
                 fd.write('\n')
 
-                self.__SaveFile(self.__filename+'_ErrorFlows.txt',self.__ErrFlows)
-                self.__SaveFile(self.__filename+'_KeyWords.txt',self.__KeyWords)
-                self.__SaveFile(self.__filename+'_CameraFlows.txt',self.__CameraFlows)
+                self.__SaveFile(self.Tags+'_ErrorFlows_'+self.__filename,self.__ErrFlows)
+                self.__SaveFile(self.Tags+'_KeyWords_'+self.__filename,self.__KeyWords)
+                self.__SaveFile(self.Tags+'_CameraFlows_'+self.__filename,self.__CameraFlows)
 
         def Dump(self):
 	    if debugLog >= debugLogLevel[-1]:
@@ -230,10 +231,22 @@ class CameraLogScan:
 
 #Global Data
 class ScanFileType:
-        __ScanFiles=()
+        __DefaultScanFiles=['cam_log_\\d']
+        __DefaultFlows={'open': 'createDevice,m_createManagers'}
+        __DefaultErrLogs=['[Offline_front2]release() -OUT-','Finger']
+        __DefaultKeyWords=['takePicture','Record','ExynosCamera']
+
+        __ScanFiles=[]
         __Flows={}
-        __ErrLogs=()
-        __KeyWords=()
+        __ErrLogs=[]
+        __KeyWords=[]
+        
+        def SetDefaultValue(self):
+            self.__ScanFiles = self.__DefaultScanFiles
+            self.__Flows = self.__DefaultFlows
+            self.__ErrLogs = self.__DefaultErrLogs
+            self.__KeyWords = self.__DefaultKeyWords
+
         
         def SetScanFiles(self,ScanFiles):
 	    if debugLog >= debugLogLevel[-1]:
@@ -315,7 +328,7 @@ class ConfigFileType:
 		line = self.__fd.readline().split('\r')[0]
 			
 		if not line:
-	            if debugLog >= debugLogLevel[2]:
+	            if debugLog >= debugLogLevel[1]:
                         ScanFiles.Dump()
 			print '\n(INFO) Finish Parse file!\n'
 		    break;
@@ -580,9 +593,10 @@ def ParseConfigFile():
         fd.close()
 
     except IOError:
-	print "ERROR: !!! Can't open "+ConfigFile+" File!!!"
-	sys.exit()
-
+	print "WARN: !!! Can't open "+ConfigFile+" File!!! UseDefaultValue"
+        global ScanFiles
+        ScanFiles.SetDefaultValue()
+        ScanFiles.Dump()
 
 
 def ParseArgv():
