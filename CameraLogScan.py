@@ -22,6 +22,8 @@
 #	liuchangjian	2020-09-30	v1.0		release first test version
 #	liuchangjian	2020-10-08	v1.0		Add unzip function
 #	liuchangjian	2020-10-08	v1.0		output txt file
+#	liuchangjian	2020-10-09	v1.0		Modify Save file path to Log Dir
+#	liuchangjian	2020-10-09	v1.0		release alpha version 1.0
 #
 ###########################################################################
 
@@ -30,6 +32,8 @@ import sys,os,re,string,time,datetime
 import zipfile
 
 # default Configure File Name
+SW_VERSION='1.0'
+
 DefaultConfigFile='configfile'
 ConfigFile=''
 ConfigFileSplitSym=','
@@ -131,7 +135,7 @@ class CameraLogScan:
                     self.__KeyWords.append(line)
                     
                     if debugLog >= debugLogLevel[-1]:
-                        print 'WARN Find KeyWord: '+line
+                        print '(WARN) Find KeyWord: '+line
 
         def CheckLogs(self,Flows,ErrLogs,KeyWords):
 	    if debugLog >= debugLogLevel[-1]:
@@ -181,7 +185,7 @@ class CameraLogScan:
                     print "Error: Can't open or write!!!"
                 else:
                     fd.close()
-                    print 'Save file: '+filename
+                    print 'Save file: '+self.__dirname+filename
             else:
 	        if debugLog >= debugLogLevel[2]:
 	            print '(WARN) Save File len is 0!'
@@ -194,19 +198,20 @@ class CameraLogScan:
 	        print 'SaveToFile:'
 
             if self.__logLines:
+                fd.write(self.__dirname+'\n')
                 fd.write(self.__filename+': '+str(self.__logLines)+'\n')
 
                 fd.write('BeginTime: '+self.__beginTime+'\n')
                 fd.write('EndTime  : '+self.__endTime+'\n')
 
                 fd.write('1.ErrorFlowsNum: '+str(self.__ErrFlowsNum)+'\n')
-                fd.write('2.KeyWordsNum: '+str(self.__KeyWordsNum)+'\n')
-                fd.write('3.FlowsNum: '+str(self.__FlowsNum)+'\n')
+                fd.write('2.KeyWordsNum  : '+str(self.__KeyWordsNum)+'\n')
+                fd.write('3.FlowsNum     : '+str(self.__FlowsNum)+'\n')
                 fd.write('\n')
 
-                self.__SaveFile(self.Tags+'_ErrorFlows_'+self.__filename,self.__ErrFlows)
+                self.__SaveFile(self.Tags+'_ErrFlows_'+self.__filename,self.__ErrFlows)
                 self.__SaveFile(self.Tags+'_KeyWords_'+self.__filename,self.__KeyWords)
-                self.__SaveFile(self.Tags+'_CameraFlows_'+self.__filename,self.__CameraFlows)
+                self.__SaveFile(self.Tags+'_CamFlows_'+self.__filename,self.__CameraFlows)
 
         def Dump(self):
 	    if debugLog >= debugLogLevel[-1]:
@@ -529,8 +534,7 @@ def SaveData(filename,datas):
     else:
         fo.close()
 
-	if debugLog >= debugLogLevel[1]:
-            print '\nSaveFile: ',filename
+        print '\nSaveFile: ',filename
 
 def DumpData(datas):
     print '\nOutput Result:'
@@ -575,7 +579,7 @@ def ParseConfigFile():
     global ConfigFile
 
     if not ConfigFile:
-        print '(WARNING) Default ConfigFile: '+DefaultConfigFile
+        print '(WARN) Default ConfigFile: '+DefaultConfigFile
         ConfigFile = DefaultConfigFile
 
     if debugLog >= debugLogLevel[-1]:
@@ -593,7 +597,7 @@ def ParseConfigFile():
         fd.close()
 
     except IOError:
-	print "WARN: !!! Can't open "+ConfigFile+" File!!! UseDefaultValue"
+        print "(WARN) !!! Can't open "+ConfigFile+" File!!! \nUseDefaultValue:"
         global ScanFiles
         ScanFiles.SetDefaultValue()
         ScanFiles.Dump()
@@ -656,6 +660,8 @@ def Usage():
 appParaNum = 6
 
 if __name__ == '__main__':
+        print 'Version: '+SW_VERSION
+
 	ParseArgv()
 
         ParseConfigFile()
