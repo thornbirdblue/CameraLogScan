@@ -41,7 +41,7 @@ ConfigFileSplitSym=','
 # ConfigFile Default Value:
 DefaultScanFiles=['cam_log_\\d']
 DefaultFlows={'open': 'connect call,HAL3_camera_device_open,createDevice,m_vendorSpecificPreConstructor,m_createManagers,m_createThreads,m_vendorSpecificConstructor','initalize':'HAL3_camera_device_initialize,initializeDevice','configureStream':'HAL3_camera_device_configure_streams,configureStreams,m_setStreamInfo,m_constructFrameFactory,m_setExtraStreamInfo,configure_stream','flush':'HAL3_camera_device_flush,flush,m_stopPipeline,m_captureThreadStopAndInputQ,m_clearRequestList,m_clearList','close':'HAL3_camera_device_close,releaseDevice,release,m_captureThreadStopAndInputQ,m_destroyCaptureStreamQ,m_vendorSpecificDestructor,destroyDevice,m_deinitFrameFactory,m_stopFrameFactory'}
-DefaultErrLogs=['out of memory','CRITICAL_LEAKED','lowmemorykiller: Killing']
+DefaultErrLogs=['Device Error Detected','ExynosCamera state is ERROR','HAL crash instead of DDK assert','DTP Detected','Flush For ESD HAL Recovery','E ExynosCameraMemoryAllocator','transitState into ERROR','service\(-1\)','Failed to m_getBayerBuffer','can.*t select bayer']
 DefaultKeyWords=['createDevice','initializeDevice','configureStreams','configure_stream','flush','releaseDevice']
 
 ScanPath=''
@@ -132,7 +132,7 @@ class CameraLogScan:
 
 
                         if debugLog >= debugLogLevel[2]:
-                            print 'Not Finish '+key+'\nLast Step:  '+step
+                            print 'Not Finish '+key+'\n'
 
 
         def __CheckErrLogs(self,line,ErrLogs):
@@ -233,11 +233,13 @@ class CameraLogScan:
                 fd.write('EndTime  : '+self.__endTime+'\n')
 
                 fd.write('1.ErrorFlowsNum: '+str(self.__ErrFlowsNum)+'\n')
-                fd.write('2.KeyWordsNum  : '+str(self.__KeyWordsNum)+'\n')
-                fd.write('3.FlowsNum     : '+str(self.__FlowsNum)+'\n')
+                fd.write('2.FlowsNum     : '+str(self.__FlowsNum)+'\n')
+                fd.write('3.ErrorLogsNum : '+str(self.__ErrLogsNum)+'\n')
+                fd.write('4.KeyWordsNum  : '+str(self.__KeyWordsNum)+'\n')
                 fd.write('\n')
 
                 self.__SaveFile(self.Tags+'_ErrFlows_'+self.__filename,self.__ErrFlows)
+                self.__SaveFile(self.Tags+'_ErrLogs_'+self.__filename,self.__ErrLogs)
                 self.__SaveFile(self.Tags+'_KeyWords_'+self.__filename,self.__KeyWords)
                 self.__SaveFile(self.Tags+'_CamFlows_'+self.__filename,self.__CameraFlows)
                 self.__SaveFile(self.Tags+'_FlowsLog_'+self.__filename,self.__CameraFlowsLog)
@@ -253,8 +255,9 @@ class CameraLogScan:
                 print 'EndTime  : '+self.__endTime+'\n'
 
                 print '1.ErrorFlowsNum: '+str(self.__ErrFlowsNum)
-                print '2.KeyWordsNum  : '+str(self.__KeyWordsNum)
-                print '3.FlowsNum     : '+str(self.__FlowsNum)
+                print '2.FlowsNum     : '+str(self.__FlowsNum)
+                print '3.ErrorLogsNum : '+str(self.__ErrLogsNum)
+                print '4.KeyWordsNum  : '+str(self.__KeyWordsNum)
 
         def getFileName(self):
 	    return os.path.join(self.__dirname,self.__filename)
