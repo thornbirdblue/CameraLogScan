@@ -24,6 +24,7 @@
 #	liuchangjian	2020-10-08	v1.0		output txt file
 #	liuchangjian	2020-10-09	v1.0		Modify Save file path to Log Dir
 #	liuchangjian	2020-10-09	v1.0		release version 1.0
+#	liuchangjian	2020-10-13	v1.1		Add Scan main_log_xxx file
 #
 ###########################################################################
 
@@ -32,21 +33,22 @@ import sys,os,re,string,time,datetime
 import zipfile
 
 # default Configure File Name
-SW_VERSION='1.0'
+SW_VERSION='1.1'
 
 DefaultConfigFile='configfile'
 ConfigFile=''
 ConfigFileSplitSym=','
 
 # ConfigFile Default Value:
-DefaultScanFiles=['cam_log_\\d']
+#DefaultDirs=['APLog_','camera_log']
+DefaultDirs=['camera_log']
+DefaultScanFiles=['cam_log_\\d','main_log_']
 DefaultFlows={'open': 'connect call,HAL3_camera_device_open,createDevice,m_vendorSpecificPreConstructor,m_createManagers,m_createThreads,m_vendorSpecificConstructor','initalize':'HAL3_camera_device_initialize,initializeDevice','configureStream':'HAL3_camera_device_configure_streams,configureStreams,m_setStreamInfo,m_constructFrameFactory,m_setExtraStreamInfo,configure_stream','flush':'HAL3_camera_device_flush,flush,m_stopPipeline,m_captureThreadStopAndInputQ,m_clearRequestList,m_clearList','close':'HAL3_camera_device_close,releaseDevice,release,m_captureThreadStopAndInputQ,m_destroyCaptureStreamQ,m_vendorSpecificDestructor,destroyDevice,m_deinitFrameFactory,m_stopFrameFactory'}
 DefaultErrLogs=['Device Error Detected','ExynosCamera state is ERROR','HAL crash instead of DDK assert','DTP Detected','Flush For ESD HAL Recovery','E ExynosCameraMemoryAllocator','transitState into ERROR','service\(-1\)','Failed to m_getBayerBuffer','can.*t select bayer']
 DefaultKeyWords=['createDevice','initializeDevice','configureStreams','configure_stream','flush','releaseDevice']
 
 ScanPath=''
 
-CamLogDirName='camera_log'
 CamLogFileName='cam_log_'
 
 # log var
@@ -213,7 +215,7 @@ class CameraLogScan:
                     print "Error: Can't open or write!!!"
                 else:
                     fd.close()
-                    print 'Save file: '+self.__dirname+filename
+                    print 'Save file: '+self.__dirname+'\\'+filename
             else:
 	        if debugLog >= debugLogLevel[2]:
 	            print '(WARN) Save File len is 0!'
@@ -268,24 +270,31 @@ class CameraLogScan:
 
 #Global Data
 class ScanFileType:
+        __ScanDirs=[]
         __ScanFiles=[]
         __Flows={}
         __ErrLogs=[]
         __KeyWords=[]
         
         def SetDefaultValue(self):
-            global DefaultScanFiles,DefaultFlows,DefaultErrLogs,DefaultKeyWords
+            global DefaultScanDirs,DefaultScanFiles,DefaultFlows,DefaultErrLogs,DefaultKeyWords
+            self.__ScanDirs = DefaultDirs
             self.__ScanFiles = DefaultScanFiles
             self.__Flows = DefaultFlows
             self.__ErrLogs = DefaultErrLogs
             self.__KeyWords = DefaultKeyWords
 
         
+        def SetScanDirs(self,ScanDirs):
+	    if debugLog >= debugLogLevel[-1]:
+	        print '(INFO) Set ScanDirs : ',ScanDirs
+            self.__ScanDirs=ScanDirs
+
         def SetScanFiles(self,ScanFiles):
 	    if debugLog >= debugLogLevel[-1]:
 	        print '(INFO) Set ScanFiles : ',ScanFiles
             self.__ScanFiles=ScanFiles
-
+        
         def SetErrLogs(self,ErrLogs):
 	    if debugLog >= debugLogLevel[-1]:
 	        print '(INFO) Set ErrLogs : ',ErrLogs
@@ -295,6 +304,11 @@ class ScanFileType:
 	    if debugLog >= debugLogLevel[-1]:
 	        print '(INFO) Set KeyWords : ',KeyWords
             self.__KeyWords=KeyWords
+
+        def GetScanDirs(self):
+	    if debugLog >= debugLogLevel[-1]:
+	        print '(INFO) Get Scandirs'
+            return self.__ScanDirs
 
         def GetScanFiles(self):
 	    if debugLog >= debugLogLevel[-1]:
@@ -322,6 +336,7 @@ class ScanFileType:
             return self.__Flows
 
         def Dump(self):
+            print 'ScanDirs: ',self.__ScanDirs
             print 'ScanFiles: ',self.__ScanFiles
             print 'Flows: ',self.__Flows
             print 'ErrLogs: ',self.__ErrLogs
@@ -342,11 +357,12 @@ class ConfigFileType:
         __fd = ''
 
         # ConfigFile KeyWord
+        __ScanDirsKey = 'Scan Dirs'
         __ScanFilesKey = 'Scan Files'
         __FlowNameKey = 'Flow Name'
         __ErrorLogsKey = 'Error Logs'
         __KeyWordsKey = 'KeyWords'
-        __ConfigTags =(__ScanFilesKey,__FlowNameKey,__ErrorLogsKey,__KeyWordsKey)
+        __ConfigTags =(__ScanDirsKey,__ScanFilesKey,__FlowNameKey,__ErrorLogsKey,__KeyWordsKey)
 
 	
 	def __init__(self,fd):
@@ -384,12 +400,16 @@ class ConfigFileType:
 
                         line=line.split(':',1)			
                         
-                        if self.__ConfigTags[i] == self.__ScanFilesKey:
+                        if self.__ConfigTags[i] == self.__ScanDirsKey:
+                            if not line[1]:
+                                print 'ERROR configfile Format: '+line[1]
+                            else:
+                                ScanFiles.SetScanDirs(line[1].strip().split(ConfigFileSplitSym))
+                        elif self.__ConfigTags[i] == self.__ScanFilesKey:
                             if not line[1]:
                                 print 'ERROR configfile Format: '+line[1]
                             else:
                                 ScanFiles.SetScanFiles(line[1].strip().split(ConfigFileSplitSym))
-
                         elif self.__ConfigTags[i] == self.__FlowNameKey:
                             flows= line[1].split(';')
 		            
@@ -453,26 +473,34 @@ def unzip_camlog_file(name,dst_dir):
         if debugLog >= debugLogLevel[-1]:
 	    print '(INFO) NOT Camera Log Dir: '+name
 
+def UnzipDir(fzip,DirName,name,DstDir):
+    Dir = re.compile(DirName)
 
-def unzip_file(zip_src,dst_dir):
+    m = re.search(Dir,name)
+    if m:
+        if debugLog >= debugLogLevel[1]:
+            print "unzip Dir: "+name
+
+        fzip.extract(name,DstDir)        
+    else:
+        if debugLog >= debugLogLevel[-1]:
+            print '(INFO) NOT Dir: '+name
+
+
+
+def UnzipDirs(zipSrc,DstDir,Dirs,Files):
     if debugLog >= debugLogLevel[-1]:
-          print '(INFO) Unzip File: '+dst_dir+'/'+zip_src
+          print '(INFO) Unzip File: '+DstDir+'/'+zipSrc
 
-    fz = zipfile.ZipFile(zip_src,'r')
+    fz = zipfile.ZipFile(zipSrc,'r')
 
     for name in fz.namelist():
-        CamLogDir = re.compile(CamLogDirName)
+        for i in range(0,len(Dirs)):
+            UnzipDir(fz,Dirs[i],name,DstDir)
 
-        m = re.search(CamLogDir,name)
-        if m:
-            if debugLog >= debugLogLevel[1]:
-                print "unzip CamLog Dir: "+name
+        for i in range(0,len(Files)):
+            UnzipDir(fz,Files[i],name,DstDir)
 
-            fz.extract(name,dst_dir)        
-        else:
-            if debugLog >= debugLogLevel[-1]:
-	        print '(INFO) NOT Camera Log Dir: '+name
-        
         unzip_camlog_file(name,os.path.dirname(name))
         
         CamLog = re.compile(CamLogFileName)
@@ -483,7 +511,7 @@ def unzip_file(zip_src,dst_dir):
             fz.extract(name,dst_dir)        
 
     if debugLog >= debugLogLevel[2]:
-        print "Finish Unzip file: "+zip_src+'\n'
+        print "Finish Unzip file: "+zipSrc+'\n'
 
     fz.close()
 
@@ -584,7 +612,7 @@ def ZipFiles(args,dirname,files):
         r=zipfile.is_zipfile(os.path.join(dirname,f))
 
         if r:
-            unzip_file(os.path.join(dirname,f),dirname)
+            UnzipDirs(os.path.join(dirname,f),dirname,ScanFiles.GetScanDirs(),ScanFiles.GetScanFiles())
         else:
             if debugLog >= debugLogLevel[2]:
                 print '(WARN) '+f+' is not zipfile!!!'
